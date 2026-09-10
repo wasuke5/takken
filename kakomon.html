@@ -30,6 +30,13 @@
     border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.08);
     color:#f6f3ee; border-radius:10px; font-size:1.15rem; cursor:pointer;
   }
+  .homebtn{
+    width:40px;height:40px;flex:0 0 auto;display:flex;
+    align-items:center;justify-content:center;text-decoration:none;
+    border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.08);
+    color:#f6f3ee; border-radius:10px; font-size:1.05rem;
+  }
+  .homebtn:hover{background:rgba(255,255,255,.2);}
   .htitle{flex:1 1 auto;min-width:0;}
   .htitle b{display:block;font-size:.92rem;line-height:1.25;}
   .htitle span{display:block;font-size:.7rem;color:#cfc4b0;}
@@ -201,6 +208,7 @@
 </head>
 <body>
 <header>
+  <a class="homebtn" href="index.html" aria-label="トップページへ戻る" title="トップページへ戻る">🏠</a>
   <button class="burger" id="burger" aria-label="年度を選ぶ">☰</button>
   <div class="htitle"><b id="h-title">—</b><span id="h-sub"></span></div>
   <div class="hcount"><b id="h-done">0</b>/50</div>

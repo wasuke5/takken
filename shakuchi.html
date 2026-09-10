@@ -36,6 +36,20 @@
   }
   header h1{margin:0 0 4px;font-size:1.25rem;letter-spacing:.02em;}
   header p{margin:0;font-size:.8rem;color:#c9c8b8;}
+
+  /* ページ間の移動（全ページ共通） */
+  nav.sitenav{
+    display:flex;flex-wrap:wrap;gap:6px;justify-content:center;
+    margin:14px 0 0;padding:0;
+  }
+  nav.sitenav a,nav.sitenav span{
+    display:inline-block;padding:6px 13px;border-radius:999px;
+    font-size:.75rem;font-weight:700;line-height:1.5;text-decoration:none;
+    border:1px solid rgba(255,255,255,.3);
+    background:rgba(255,255,255,.14);color:#f6f3ee;
+  }
+  nav.sitenav a:hover{background:rgba(255,255,255,.26);}
+  nav.sitenav .here{background:#f6f3ee;color:#26251f;border-color:#f6f3ee;cursor:default;}
   nav.tabs{
     display:flex;flex-wrap:wrap;gap:8px;justify-content:center;
     padding:14px 12px;max-width:900px;margin:0 auto;
@@ -232,6 +246,13 @@
 <header>
   <h1>宅建 借地借家法クイズ</h1>
   <p>SECTION 13「借地」・SECTION 14「借家」｜4択</p>
+  <nav class="sitenav">
+    <a href="index.html">🏠 トップ</a>
+    <a href="toshi.html">都市計画法・建築基準法</a>
+    <a href="gyouhou.html">宅建業法</a>
+    <span class="here">借地借家法ほか</span>
+    <a href="kakomon.html">過去問10年分</a>
+  </nav>
 </header>
 
 <nav class="tabs">

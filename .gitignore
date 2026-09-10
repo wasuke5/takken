@@ -1,0 +1,8 @@
+# バックアップ・ログ・ローカル専用のファイルは公開しない
+*.bak
+*.bak[0-9]
+*.bak_*
+*.log
+current-url.txt
+start-quiz-server.ps1
+work/

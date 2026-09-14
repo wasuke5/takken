@@ -3565,6 +3565,20 @@ function saveWrong(){
   }catch(e){ /* プライベートモード等では保存できないが動作は継続する */ }
 }
 
+/* 記録に問題文が無いとき（バックアップから復元した直後など）は元データから組み立てる */
+function backupSafeLabel(e){
+  if(e.label) return {label:e.label, kind:e.kind || ''};
+  try{
+    const code = e.qid.split(':')[0];
+    const i    = Number(e.qid.split(':')[1]);
+    if(code === 'zone'){ const q = ZONE_QUIZ_POOL[i]; return {label:q.question, kind:q.tagLabel}; }
+    if(code === 'art'){  const q = ART_ITEMS[i];      return {label:`「${q.name}」は35条・37条どっち？`, kind:q.cat}; }
+    const gen = Q4_GEN_BY_CODE[code];
+    if(gen){ const q = gen(i); return {label:q.text, kind:q.tagLabel}; }
+  }catch(err){}
+  return {label:'(問題)', kind:e.kind || ''};
+}
+
 function recordAnswer(qid, isCorrect, label, kind){
   if(!qid) return;
   if(isCorrect){
@@ -3686,10 +3700,11 @@ function wrongRow(e, scopeKey){
   body.className = 'body';
   const ttl = document.createElement('div');
   ttl.className = 'ttl';
-  ttl.textContent = e.label || '(問題)';
+  const lk = backupSafeLabel(e);
+  ttl.textContent = lk.label;
   const kind = document.createElement('div');
   kind.className = 'kind';
-  let note = e.kind || '';
+  let note = lk.kind;
   if(e.last==='correct')  note += '　✓ 直近は正解';
   else if(e.count>=3)     note += '<span class="alert">　⚠ ' + e.count + '回目 まだ覚えられていません</span>';
   else if(e.count>=2)     note += '<span class="alert">　⚠ 要注意</span>';
@@ -4111,5 +4126,6 @@ try{
   if(savedTab) activateTab(savedTab, false);
 }catch(e){}
 </script>
+<script src="backup.js"></script>
 </body>
 </html>

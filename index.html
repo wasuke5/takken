@@ -57,6 +57,19 @@
     background:#f2efe8;color:#5f5a51;font-size:.68rem;line-height:1.6;
   }
 
+  /* バックアップの入口 */
+  button.backupcard{
+    display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+    font:inherit;color:inherit;cursor:pointer;
+    background:#fbfaf6;border:1px dashed #cfc9bb;border-radius:var(--radius);
+    padding:14px 18px;margin:4px 0 14px;
+  }
+  button.backupcard:hover{border-color:var(--accent);}
+  .bc-icon{flex:0 0 auto;font-size:1.4rem;}
+  .bc-body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+  .bc-body b{font-size:.95rem;}
+  .bc-body span{font-size:.75rem;color:var(--sub);}
+
   .note{
     max-width:760px;margin:6px auto 0;padding:0 16px;
     font-size:.75rem;color:var(--sub);line-height:1.7;
@@ -129,14 +142,22 @@
     </div>
   </a>
 
+  <button type="button" class="backupcard" data-backup-open>
+    <span class="bc-icon">💾</span>
+    <span class="bc-body"><b>データのバックアップ・復元</b><span>間違えた問題や「あとで解く」を文字列にして保管できます</span></span>
+    <span class="pc-go">開く →</span>
+  </button>
+
 </main>
 
 <p class="note">
   正解数・出題の並び順・間違えた問題・<b>あとで解き直す</b>に保存した問題は、すべて<b>開いている端末のブラウザの中</b>に保存されます。
   スマホとパソコンでは別々にたまり、通信が切れても続きから再開できます。
+  機種変更の前や、履歴を消す前は<b>バックアップ</b>を取っておくと安心です。
 </p>
 
 <footer>宅建試験の学習用に作成したクイズです。</footer>
 
+<script src="backup.js"></script>
 </body>
 </html>

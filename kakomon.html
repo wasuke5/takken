@@ -219,6 +219,7 @@
   <h2>年度を選ぶ<button id="drawerclose" aria-label="閉じる">×</button></h2>
   <div class="yearlist" id="yearlist"></div>
   <p class="note" id="drawernote"></p>
+  <div style="padding:0 8px 20px"><button type="button" class="yearbtn" data-backup-open>💾 データのバックアップ・復元</button></div>
 </nav>
 
 <div class="wrap">
@@ -735,5 +736,6 @@ const last = localStorage.getItem(KEY + '_last');
 selectExam(EXAMS.find(e=>e.id===last) ? last : EXAMS[0].id);
 
 </script>
+<script src="backup.js"></script>
 </body>
 </html>

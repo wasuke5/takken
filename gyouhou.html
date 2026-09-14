@@ -7946,6 +7946,13 @@ function saveWrong(){
   try{ localStorage.setItem(WRONG_KEY, JSON.stringify(wrongStore)); }catch(e){}
 }
 
+/* 記録に問題文が無いとき（バックアップから復元した直後など）は元データから組み立てる */
+function backupSafeLabel(e){
+  if(e.label) return {label:e.label, kind:e.kind || ''};
+  try{ const q = makeQuestion(e.qid); return {label:q.text, kind:q.tagLabel}; }catch(err){}
+  return {label:'(問題)', kind:e.kind || ''};
+}
+
 function recordAnswer(qid, isCorrect, label, kind){
   if(!qid) return;
   if(isCorrect){
@@ -8098,10 +8105,11 @@ function makeWrongRow(e, holder, src){
   body.className = 'body';
   const ttl = document.createElement('div');
   ttl.className = 'ttl';
-  ttl.textContent = e.label || '(問題)';
+  const lk = backupSafeLabel(e);
+  ttl.textContent = lk.label;
   const kind = document.createElement('div');
   kind.className = 'kind';
-  kind.textContent = (e.kind || '') + (e.last === 'correct' ? '　✓ 直近は正解' : '');
+  kind.textContent = lk.kind + (e.last === 'correct' ? '　✓ 直近は正解' : '');
   body.appendChild(ttl);
   body.appendChild(kind);
 
@@ -8375,11 +8383,12 @@ function makeMarkRow(e, holder, src){
   body.className = 'body';
   const ttl = document.createElement('div');
   ttl.className = 'ttl';
-  ttl.textContent = e.label || '(問題)';
+  const lk = backupSafeLabel(e);
+  ttl.textContent = lk.label;
   const kind = document.createElement('div');
   kind.className = 'kind';
   const w = wrongStore[e.qid];
-  kind.textContent = (e.kind || '') + (w ? '　×' + w.count + ' 回間違え' : '');
+  kind.textContent = lk.kind + (w ? '　×' + w.count + ' 回間違え' : '');
   body.appendChild(ttl);
   body.appendChild(kind);
 
@@ -8601,5 +8610,6 @@ try{
   if(savedTab) activateTab(savedTab, false);
 }catch(e){}
 </script>
+<script src="backup.js"></script>
 </body>
 </html>

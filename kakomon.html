@@ -732,8 +732,22 @@ document.addEventListener('keydown', e=>{
   if(e.key === 'Enter')      checkOne();
 });
 
+/* 「kakomon.html#R7-41」のように開かれたら、その年度のその問題を表示する
+   （宅建業法ページの「この論点が出た過去問」から飛んできたとき） */
+function openFromHash(){
+  const m = /^#(\w+)-(\d+)$/.exec(location.hash);
+  if(!m || !EXAMS.find(e=>e.id===m[1])) return false;
+  const n = Number(m[2]);
+  if(n < 1 || n > 50) return false;
+  selectExam(m[1]);
+  if(mode === 'result') backToQuiz();
+  goto(n);
+  return true;
+}
+window.addEventListener('hashchange', openFromHash);
+
 const last = localStorage.getItem(KEY + '_last');
-selectExam(EXAMS.find(e=>e.id===last) ? last : EXAMS[0].id);
+if(!openFromHash()) selectExam(EXAMS.find(e=>e.id===last) ? last : EXAMS[0].id);
 
 </script>
 <script src="backup.js"></script>

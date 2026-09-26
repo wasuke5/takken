@@ -112,12 +112,20 @@
   }
 
   function summarize(d){
-    var w = 0, m = 0, ex = 0;
+    var w = 0, m = 0, ex = 0, later = 0;
     Object.keys(d || {}).forEach(function(k){
       var v = d[k];
       if(!v || typeof v !== 'object') return;
       if(/_wrong_v\d+$/.test(k))       w += Object.keys(v).length;
       else if(/_marked_v\d+$/.test(k)) m += Object.keys(v).length;
+      else if(/^takken_kakomon_later_v\d+$/.test(k)){
+        Object.keys(v).forEach(function(id){
+          var questions = v[id];
+          if(questions && typeof questions === 'object'){
+            later += Object.keys(questions).filter(function(n){ return !!questions[n]; }).length;
+          }
+        });
+      }
       else if(/^takken_kakomon_v\d+$/.test(k)){
         Object.keys(v).forEach(function(id){
           var s = v[id];
@@ -125,7 +133,7 @@
         });
       }
     });
-    return '間違えた問題 ' + w + '問／あとで解く ' + m + '問／過去問 ' + ex + '回分';
+    return '間違えた問題 ' + w + '問／あとで解く ' + m + '問／過去問のあとで解く ' + later + '問／過去問 ' + ex + '回分';
   }
 
   /* ---- 文字列にする／文字列から戻す ---- */

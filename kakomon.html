@@ -91,6 +91,10 @@
   .progline{display:flex;justify-content:space-between;font-size:.7rem;color:var(--sub);margin-bottom:7px;}
   .progbar{height:6px;background:#eee7dc;border-radius:99px;overflow:hidden;margin-bottom:9px;}
   .progbar div{height:100%;background:var(--accent);width:0;transition:width .25s;}
+  .later-toolbar{display:flex;gap:8px;margin-top:10px;}
+  .later-action{flex:1 1 0;border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 10px;color:var(--ink);font-size:.75rem;font-weight:700;cursor:pointer;}
+  .later-action:hover{border-color:var(--accent);color:var(--accent);}
+  .later-action b{color:var(--accent);}
 
   /* 問題カード */
   .qcard{
@@ -108,6 +112,25 @@
     padding:5px 11px;font-size:.72rem;color:var(--sub);cursor:pointer;
   }
   .flagbtn.on{background:#fdf3e0;border-color:var(--miss);color:var(--miss);}
+  .latercheck{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 9px;font-size:.72rem;color:var(--sub);cursor:pointer;}
+  .latercheck.on{background:#fdeee7;border-color:var(--accent);color:var(--accent);font-weight:700;}
+  .latercheck input{width:16px;height:16px;margin:0;accent-color:var(--accent);}
+  .navcell.later{border-style:dashed;}
+  .navcell.flag.later{box-shadow:inset 0 -3px 0 var(--miss),inset 0 0 0 1px var(--accent);}
+  .later-panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;}
+  .later-panel-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;}
+  .later-panel-title{flex:1;min-width:0;}
+  .later-panel-title b{display:block;font-size:.98rem;}
+  .later-panel-title span{display:block;color:var(--sub);font-size:.72rem;margin-top:2px;}
+  .later-close{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 10px;color:var(--ink);font-size:.75rem;font-weight:700;cursor:pointer;white-space:nowrap;}
+  .later-group{border:1px solid var(--line);border-radius:10px;margin-top:8px;overflow:hidden;}
+  .later-group summary{padding:10px 12px;background:#fbf8f3;cursor:pointer;font-size:.82rem;font-weight:700;}
+  .later-group-body{padding:4px 10px 10px;}
+  .later-row{display:flex;align-items:flex-start;gap:9px;border-top:1px solid var(--line);padding:10px 2px;}
+  .later-openq{flex:1;min-width:0;border:0;background:transparent;padding:0;text-align:left;color:var(--ink);cursor:pointer;}
+  .later-openq b{display:block;color:var(--accent);font-size:.75rem;margin-bottom:3px;}
+  .later-openq span{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;font-size:.78rem;line-height:1.6;}
+  .later-empty{padding:14px 6px;text-align:center;color:var(--sub);font-size:.8rem;}
   .stem{font-size:.95rem;line-height:1.85;margin:0 0 16px;white-space:pre-wrap;}
   .ocrwarn{
     font-size:.7rem;color:#8a6d1f;background:#fdf7ec;border-left:3px solid var(--miss);
@@ -227,7 +250,12 @@
     <div class="progline"><span id="prog-text">0 / 50 問 回答済み</span><span id="prog-flag"></span></div>
     <div class="progbar"><div id="progfill"></div></div>
     <div class="navgrid" id="navgrid"></div>
+    <div class="later-toolbar">
+      <button type="button" class="later-action" id="btn-later-year">この年度のあとで解く（0）</button>
+      <button type="button" class="later-action" id="btn-later-all">全年度のあとで解く（0）</button>
+    </div>
   </div>
+  <div id="laterhost" hidden></div>
   <div id="qhost"></div>
   <div id="resulthost"></div>
 </div>
@@ -291,11 +319,14 @@ const GROUPS = [
 function groupOf(n){ return GROUPS.find(g => n >= g.from && n <= g.to); }
 
 const KEY = 'takken_kakomon_v2';
+const LATER_KEY = 'takken_kakomon_later_v1';
 
 let store = {};
+let laterStore = {};
 let exam  = null;
 let cur   = 1;
 let mode  = 'quiz';        // quiz | result
+let laterOpen = false;
 let zoomOn = false;        // スキャン年度の画像を拡大表示するか
 let scanOn = false;        // 書き起こし年度で原文スキャンも並べて出すか
 
@@ -304,6 +335,44 @@ function loadStore(){
 }
 function saveStore(){
   try{ localStorage.setItem(KEY, JSON.stringify(store)); }catch(e){}
+}
+function loadLaterStore(){
+  try{
+    const value = JSON.parse(localStorage.getItem(LATER_KEY)) || {};
+    laterStore = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  }catch(e){ laterStore = {}; }
+}
+function saveLaterStore(){
+  try{ localStorage.setItem(LATER_KEY, JSON.stringify(laterStore)); }catch(e){}
+}
+function laterNumbers(id){
+  const record = laterStore[id];
+  if(!record || typeof record !== 'object' || Array.isArray(record)) return [];
+  return Object.keys(record).map(Number)
+    .filter(n => Number.isInteger(n) && n >= 1 && n <= 50 && !!record[n])
+    .sort((a,b) => a-b);
+}
+function isLater(id, n){ return laterNumbers(id).includes(n); }
+function setLater(id, n, checked){
+  if(checked){
+    if(!laterStore[id] || typeof laterStore[id] !== 'object' || Array.isArray(laterStore[id])) laterStore[id] = {};
+    laterStore[id][n] = true;
+  }else if(laterStore[id]){
+    delete laterStore[id][n];
+    if(!Object.keys(laterStore[id]).length) delete laterStore[id];
+  }
+  saveLaterStore();
+  updateLaterButtons();
+}
+function countAllLater(){
+  return EXAMS.reduce((total, e) => total + laterNumbers(e.id).length, 0);
+}
+function updateLaterButtons(){
+  const yearButton = document.getElementById('btn-later-year');
+  const allButton = document.getElementById('btn-later-all');
+  if(!yearButton || !allButton) return;
+  yearButton.textContent = 'この年度のあとで解く（' + (exam ? laterNumbers(exam.id).length : 0) + '）';
+  allButton.textContent = '全年度のあとで解く（' + countAllLater() + '）';
 }
 function st(id){
   if(!store[id]) store[id] = {ans:{}, flags:{}, checked:{}, graded:false, last:1};
@@ -324,13 +393,14 @@ function buildYearList(){
   EXAMS.forEach(e=>{
     const s = st(e.id);
     const done = Object.keys(s.ans).length;
+    const laterCount = laterNumbers(e.id).length;
     const b = document.createElement('button');
     b.className = 'yearbtn' + (exam && exam.id===e.id ? ' on' : '');
     let sub;
     if(s.graded)  sub = '採点済み ' + scoreOf(e).total + '点 / 50';
     else if(done) sub = '解答中 ' + done + '/50問';
     else          sub = '未着手（合格基準 ' + e.pass + '点）';
-    b.innerHTML = '<span class="yl">' + e.label + '</span><span class="ys">' + sub + '</span>';
+    b.innerHTML = '<span class="yl">' + e.label + '</span><span class="ys">' + sub + ' · あとで解く ' + laterCount + '問</span>';
     b.onclick = ()=>{ selectExam(e.id); closeDrawer(); };
     box.appendChild(b);
   });
@@ -370,6 +440,23 @@ function renderQuestion(){
   meta.className = 'qmeta';
   meta.innerHTML = '<span class="qnum">問 ' + cur + '</span>'
                  + '<span class="qtag" style="color:' + g.color + '">' + g.name + '</span>';
+  const laterLabel = document.createElement('label');
+  const laterInput = document.createElement('input');
+  const laterChecked = isLater(exam.id, cur);
+  laterLabel.className = 'latercheck' + (laterChecked ? ' on' : '');
+  laterInput.type = 'checkbox';
+  laterInput.checked = laterChecked;
+  laterInput.setAttribute('aria-label', 'この問題をあとで解く問題に保存');
+  laterInput.onchange = ()=>{
+    setLater(exam.id, cur, laterInput.checked);
+    renderQuestion();
+    renderNav();
+  };
+  const laterText = document.createElement('span');
+  laterText.textContent = 'あとで解く';
+  laterLabel.appendChild(laterInput);
+  laterLabel.appendChild(laterText);
+  meta.appendChild(laterLabel);
   const flag = document.createElement('button');
   flag.className = 'flagbtn' + (s.flags[cur] ? ' on' : '');
   flag.textContent = s.flags[cur] ? '△ 見直す' : '△ 見直し';
@@ -584,6 +671,7 @@ function renderNav(){
       cls += ' done';
     }
     if(s.flags[n]) cls += ' flag';
+    if(isLater(exam.id, n)) cls += ' later';
     if(n === cur && mode === 'quiz') cls += ' cur';
     c.className = cls;
   }
@@ -694,6 +782,7 @@ function resetExam(){
    年度の選択
    ============================================================ */
 function selectExam(id){
+  if(laterOpen) closeLaterList();
   exam = EXAMS.find(e=>e.id===id);
   const s = st(exam.id);
   cur = s.last || 1;
@@ -707,13 +796,140 @@ function selectExam(id){
   document.getElementById('qhost').style.display = '';
   renderQuestion();
   renderNav();
+  updateLaterButtons();
   if(s.graded) showResult();
+}
+
+function laterGroupTitle(g){
+  if(g.name === '税・その他') return '税法・その他';
+  if(g.name === '5点免除科目') return '5問免除問題';
+  return g.name;
+}
+function openLaterList(scope){
+  if(!exam) return;
+  laterOpen = true;
+  document.getElementById('qhost').style.display = 'none';
+  document.getElementById('resulthost').style.display = 'none';
+  document.getElementById('footbar').style.display = 'none';
+  renderLaterList(scope);
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function closeLaterList(){
+  laterOpen = false;
+  document.getElementById('laterhost').hidden = true;
+  document.getElementById('footbar').style.display = '';
+  if(mode === 'result') document.getElementById('resulthost').style.display = '';
+  else document.getElementById('qhost').style.display = '';
+}
+function renderLaterList(scope){
+  const host = document.getElementById('laterhost');
+  const expandedGroups = new Set();
+  host.querySelectorAll('.later-group[open]').forEach(details=>expandedGroups.add(details.dataset.group));
+  const selectedExams = scope === 'all' ? EXAMS : [exam];
+  const grouped = GROUPS.map(g=>({group:g, items:[]}));
+  selectedExams.forEach(e=>{
+    laterNumbers(e.id).forEach(n=>{
+      const group = groupOf(n);
+      const bucket = grouped.find(row=>row.group === group);
+      if(bucket) bucket.items.push({exam:e, n:n});
+    });
+  });
+  const total = grouped.reduce((sum,row)=>sum+row.items.length,0);
+  host.innerHTML = '';
+  host.hidden = false;
+
+  const panel = document.createElement('section');
+  panel.className = 'later-panel';
+  const head = document.createElement('div');
+  head.className = 'later-panel-head';
+  const title = document.createElement('div');
+  title.className = 'later-panel-title';
+  const titleText = document.createElement('b');
+  titleText.textContent = scope === 'all' ? '全年度の「あとで解く」' : exam.label + 'の「あとで解く」';
+  const subtitle = document.createElement('span');
+  subtitle.textContent = total + '問 · 分野ごとに表示 · 問題を押すとその問題へ移動します';
+  title.appendChild(titleText);
+  title.appendChild(subtitle);
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'later-close';
+  close.textContent = '問題に戻る';
+  close.onclick = closeLaterList;
+  head.appendChild(title);
+  head.appendChild(close);
+  panel.appendChild(head);
+
+  if(!total){
+    const empty = document.createElement('div');
+    empty.className = 'later-empty';
+    empty.textContent = 'まだ保存した問題はありません。問題の「あとで解く」にチェックすると、ここに表示されます。';
+    panel.appendChild(empty);
+  }
+
+  grouped.forEach(row=>{
+    const details = document.createElement('details');
+    details.className = 'later-group';
+    details.dataset.group = row.group.name;
+    details.open = (scope === 'year' && row.items.length > 0) || expandedGroups.has(row.group.name);
+    const summary = document.createElement('summary');
+    summary.textContent = laterGroupTitle(row.group) + '（' + row.items.length + '問）';
+    details.appendChild(summary);
+    if(row.items.length){
+      const body = document.createElement('div');
+      body.className = 'later-group-body';
+      row.items.forEach(item=>{
+        const rowEl = document.createElement('div');
+        rowEl.className = 'later-row';
+        const open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'later-openq';
+        const label = document.createElement('b');
+        label.textContent = (scope === 'all' ? item.exam.label + ' · ' : '') + '問 ' + item.n;
+        const snippet = document.createElement('span');
+        const q = item.exam.qs[item.n - 1];
+        const stem = q.stem || '公式問題PDFの画像で表示される問題です。';
+        snippet.textContent = stem.length > 240 ? stem.slice(0, 240) + '…' : stem;
+        open.appendChild(label);
+        open.appendChild(snippet);
+        open.onclick = ()=>openLaterQuestion(item.exam.id, item.n);
+
+        const toggle = document.createElement('label');
+        toggle.className = 'latercheck on';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = true;
+        input.setAttribute('aria-label', 'あとで解く一覧から外す');
+        input.onchange = ()=>{
+          setLater(item.exam.id, item.n, false);
+          renderLaterList(scope);
+        };
+        const toggleText = document.createElement('span');
+        toggleText.textContent = '保存中';
+        toggle.appendChild(input);
+        toggle.appendChild(toggleText);
+        rowEl.appendChild(open);
+        rowEl.appendChild(toggle);
+        body.appendChild(rowEl);
+      });
+      details.appendChild(body);
+    }
+    panel.appendChild(details);
+  });
+
+  host.appendChild(panel);
+}
+function openLaterQuestion(examId, n){
+  closeLaterList();
+  if(!exam || exam.id !== examId) selectExam(examId);
+  if(mode === 'result') backToQuiz();
+  goto(n);
 }
 
 /* ============================================================
    初期化
    ============================================================ */
 loadStore();
+loadLaterStore();
 try{ zoomOn = !!localStorage.getItem(KEY + '_zoom'); }catch(e){}
 try{ scanOn = !!localStorage.getItem(KEY + '_scan'); }catch(e){}
 buildNav();
@@ -723,6 +939,8 @@ document.getElementById('drawerclose').onclick = closeDrawer;
 document.getElementById('btn-prev').onclick    = ()=>goto(cur-1);
 document.getElementById('btn-next').onclick    = ()=>goto(cur+1);
 document.getElementById('btn-grade').onclick   = ()=>{ if(mode==='result') backToQuiz(); else grade(); };
+document.getElementById('btn-later-year').onclick = ()=>openLaterList('year');
+document.getElementById('btn-later-all').onclick = ()=>openLaterList('all');
 
 document.addEventListener('keydown', e=>{
   if(mode !== 'quiz') return;

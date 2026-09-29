@@ -306,6 +306,15 @@
   .mgroup .name{font-size:.86rem;font-weight:700;}
   .mgroup .num{font-size:.72rem;color:var(--sub);white-space:nowrap;}
   .mgroup.open .caret{transform:rotate(90deg);}
+  .saved-miss-section{margin-top:24px;padding-top:18px;border-top:2px solid var(--bad);}
+  .saved-miss-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;font-size:.88rem;font-weight:700;}
+  .saved-miss-head .num{font-size:.75rem;font-weight:400;color:var(--sub);white-space:nowrap;}
+  .saved-miss-start{width:100%;padding:10px 12px;margin:0 0 12px;border:1px solid var(--bad);border-radius:10px;background:#fff7f5;color:var(--bad);font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;}
+  .saved-miss-start:disabled{opacity:.45;cursor:default;}
+  .missgroup{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:18px 0 8px;padding-bottom:4px;border-bottom:2px solid var(--bad);}
+  .missgroup:first-child{margin-top:0;}
+  .missgroup .name{font-size:.86rem;font-weight:700;}
+  .missgroup .num{font-size:.72rem;color:var(--sub);white-space:nowrap;}
 
   /* まとめ表 */
   .ref h2{font-size:1rem;margin:26px 0 10px;padding-bottom:6px;border-bottom:2px solid var(--ink);}
@@ -859,6 +868,17 @@
       <p class="hintline" id="saved-empty">まだ保存はありません。どのタブでも、問題の「☆ あとで解き直す」を押すとここにたまります（間違えた記録とは別枠です）。各分野のタブの中でも分野ごとに見られます。</p>
       <div id="saved-list"></div>
       <button class="clearbtn" id="saved-clear">全分野の保存をすべて外す</button>
+      <div class="saved-miss-section">
+        <div class="saved-miss-head">
+          <span>あとで解くで間違えた問題だけ</span>
+          <span class="num"><b id="saved-miss-count">0</b> 問</span>
+        </div>
+        <p class="hintline" id="saved-miss-empty">「あとで解く」の問題を解いたとき、間違えた問題がここに保存されます。正解するとこの一覧から外れます。</p>
+        <button type="button" class="saved-miss-start" id="saved-miss-start">間違えた問題だけ解く</button>
+        <div id="saved-miss-holder"></div>
+        <div id="saved-miss-list"></div>
+        <button class="clearbtn" id="saved-miss-clear">間違えた問題の記録をすべて消す</button>
+      </div>
     </div>
   </section>
 
@@ -7777,7 +7797,7 @@ const mxQids = kiQids.concat(meQids).concat(skQids).concat(eiQids).concat(hoQids
 /* ============================================================
    出題の描画
    ============================================================ */
-function buildQuestion(holder, q, scoreObj, onNext){
+function buildQuestion(holder, q, scoreObj, onNext, onAnswer){
   holder.innerHTML = '';
   let locked = false;
 
@@ -7845,6 +7865,7 @@ function buildQuestion(holder, q, scoreObj, onNext){
       exEl.innerHTML = buildExplain(q);
       nextBtn.className = 'nextbtn show';
       recordAnswer(q.qid, isCorrect, q.text, q.tagLabel);
+      if(typeof onAnswer === 'function') onAnswer(q, isCorrect);
       updateScores();
     };
     choicesEl.appendChild(btn);
@@ -8301,6 +8322,43 @@ function saveMark(){
   try{ localStorage.setItem(MARK_KEY, JSON.stringify(markStore)); }catch(e){}
 }
 
+/* 「あとで解く」の解き直しで間違えた問題だけを別に記録する。
+   既存の保存・間違い記録キーは変更せず、この専用キーを追加する。 */
+const MARK_WRONG_KEY = 'gyouhou_mark_review_wrong_v1';
+let markWrongStore = {};
+function loadMarkWrong(){
+  try{ markWrongStore = JSON.parse(localStorage.getItem(MARK_WRONG_KEY)) || {}; }
+  catch(e){ markWrongStore = {}; }
+}
+function saveMarkWrong(){
+  try{ localStorage.setItem(MARK_WRONG_KEY, JSON.stringify(markWrongStore)); }catch(e){}
+}
+function markWrongEntries(src){
+  const list = [];
+  Object.keys(markWrongStore).forEach(function(qid){
+    if(src && qid.split(':')[0] !== src) return;
+    const e = markWrongStore[qid] || {};
+    list.push({qid:qid, count:e.count || 0, label:e.label, kind:e.kind, at:e.at || 0});
+  });
+  list.sort(function(a,b){ return (b.at - a.at) || (b.count - a.count); });
+  return list;
+}
+function recordMarkReviewAnswer(q, isCorrect){
+  if(!q || !q.qid) return;
+  if(isCorrect){
+    delete markWrongStore[q.qid];
+  }else{
+    const e = markWrongStore[q.qid] || {count:0};
+    e.count += 1;
+    e.label = q.text;
+    e.kind = q.tagLabel;
+    e.at = Date.now();
+    markWrongStore[q.qid] = e;
+  }
+  saveMarkWrong();
+  renderMarkWrongOverview();
+}
+
 function isMarked(qid){ return !!markStore[qid]; }
 
 /* ★を付ける／外す。付けた時刻を持たせて新しい順に並べる */
@@ -8384,8 +8442,145 @@ function markQuestion(qid, holder, src){
   buildQuestion(inner, makeQuestion(qid), scoreRV, function(){
     if(idx < 0 || idx + 1 >= order.length){ markDone(holder, src); return; }
     markQuestion(order[idx + 1], holder, src);
-  });
+  }, recordMarkReviewAnswer);
   box.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+/* 「あとで解く」の解き直しで間違えた問題だけを再挑戦するセッション */
+let markWrongSeq = {holder:null, src:null, order:[]};
+function markWrongRemain(src){ return markWrongEntries(src).length; }
+function startMarkWrongRetry(qid, holder, src){
+  markWrongSeq = {holder:holder, src:src, order:markWrongEntries(src).map(function(e){ return e.qid; })};
+  if(markWrongSeq.order.indexOf(qid) < 0) markWrongSeq.order.unshift(qid);
+  markWrongQuestion(qid, holder, src);
+}
+function nextMarkWrongQid(curQid, src){
+  const order = markWrongSeq.order || [];
+  if(order.length === 0) return null;
+  const idx = order.indexOf(curQid);
+  for(let i=1;i<=order.length;i++){
+    const qid = order[((idx < 0 ? -1 : idx) + i + order.length) % order.length];
+    if(qid !== curQid && markWrongStore[qid]) return qid;
+  }
+  return markWrongStore[curQid] ? curQid : null;
+}
+function markWrongQuestion(qid, holder, src){
+  const box = document.createElement('div');
+  box.className = 'reviewbox';
+  const head = document.createElement('div');
+  head.className = 'reviewbox-head';
+  const remain = markWrongRemain(src);
+  head.innerHTML = '<span>間違えた問題に再挑戦中（未正解 残り ' + remain + ' 問）</span>';
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '閉じる';
+  closeBtn.onclick = function(){ holder.innerHTML = ''; };
+  head.appendChild(closeBtn);
+  const inner = document.createElement('div');
+  box.appendChild(head);
+  box.appendChild(inner);
+  holder.innerHTML = '';
+  holder.appendChild(box);
+  const q = makeQuestion(qid);
+  buildQuestion(inner, q, scoreRV, function(){
+    const nextQid = nextMarkWrongQid(qid, src);
+    if(nextQid === null){ markWrongDone(holder); return; }
+    markWrongQuestion(nextQid, holder, src);
+  }, recordMarkReviewAnswer);
+  box.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function markWrongDone(holder){
+  const box = document.createElement('div');
+  box.className = 'reviewbox';
+  const head = document.createElement('div');
+  head.className = 'reviewbox-head';
+  head.innerHTML = '<span>間違えた問題の解き直し完了</span>';
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '閉じる';
+  closeBtn.onclick = function(){ holder.innerHTML = ''; };
+  head.appendChild(closeBtn);
+  const msg = document.createElement('p');
+  msg.className = 'hintline';
+  msg.style.margin = '10px 2px 2px';
+  msg.textContent = 'この一覧の問題はすべて正解しました。間違えた問題の記録から外れています。';
+  box.appendChild(head);
+  box.appendChild(msg);
+  holder.innerHTML = '';
+  holder.appendChild(box);
+  box.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function makeMarkWrongRow(e, holder, src){
+  const row = document.createElement('div');
+  row.className = 'wrongrow';
+  row.onclick = function(){ startMarkWrongRetry(e.qid, holder, src); };
+  const cnt = document.createElement('div');
+  cnt.className = 'cnt';
+  cnt.textContent = '×' + e.count;
+  const body = document.createElement('div');
+  body.className = 'body';
+  const ttl = document.createElement('div');
+  ttl.className = 'ttl';
+  const lk = backupSafeLabel(e);
+  ttl.textContent = lk.label;
+  const kind = document.createElement('div');
+  kind.className = 'kind';
+  kind.textContent = lk.kind + '　あとで解くで間違え';
+  body.appendChild(ttl);
+  body.appendChild(kind);
+  const del = document.createElement('button');
+  del.className = 'del';
+  del.textContent = '×';
+  del.title = 'この問題を間違えた問題一覧から外す';
+  del.onclick = function(ev){
+    ev.stopPropagation();
+    delete markWrongStore[e.qid];
+    saveMarkWrong();
+    renderMarkWrongOverview();
+  };
+  row.appendChild(cnt);
+  row.appendChild(body);
+  row.appendChild(del);
+  return row;
+}
+function renderMarkWrongOverview(){
+  const list = document.getElementById('saved-miss-list');
+  const empty = document.getElementById('saved-miss-empty');
+  const count = document.getElementById('saved-miss-count');
+  const start = document.getElementById('saved-miss-start');
+  const clear = document.getElementById('saved-miss-clear');
+  const holder = document.getElementById('saved-miss-holder');
+  if(!list || !empty || !count || !start || !clear || !holder) return;
+  list.innerHTML = '';
+  const all = markWrongEntries(null);
+  count.textContent = all.length;
+  empty.style.display = all.length === 0 ? 'block' : 'none';
+  start.disabled = all.length === 0;
+  clear.style.display = all.length === 0 ? 'none' : 'block';
+  SRC_KEYS.forEach(function(src){
+    const entries = markWrongEntries(src);
+    if(entries.length === 0) return;
+    const head = document.createElement('div');
+    head.className = 'missgroup';
+    head.innerHTML = '<span class="name">' + SRC_LABEL[src] + '</span><span class="num">' + entries.length + ' 問</span>';
+    list.appendChild(head);
+    entries.forEach(function(e){ list.appendChild(makeMarkWrongRow(e, holder, src)); });
+  });
+}
+const markWrongStartBtn = document.getElementById('saved-miss-start');
+if(markWrongStartBtn){
+  markWrongStartBtn.onclick = function(){
+    const first = markWrongEntries(null)[0];
+    if(first) startMarkWrongRetry(first.qid, document.getElementById('saved-miss-holder'), null);
+  };
+}
+const markWrongClearBtn = document.getElementById('saved-miss-clear');
+if(markWrongClearBtn){
+  markWrongClearBtn.onclick = function(){
+    if(!confirm('「あとで解く」で間違えた問題の記録をすべて消します。よろしいですか？')) return;
+    markWrongStore = {};
+    saveMarkWrong();
+    document.getElementById('saved-miss-holder').innerHTML = '';
+    renderMarkWrongOverview();
+  };
 }
 
 /* 保存した問題を一巡したとき */
@@ -8634,6 +8829,7 @@ function renderRefTab(){
 loadProg();
 loadWrong();
 loadMark();
+loadMarkWrong();
 loadOpen();
 
 PANEL_DEFS.forEach(function(def){ PANELS[def.key] = makePanel(def); });
@@ -8643,6 +8839,7 @@ setupWrongToggles();
 setupMarkToggles();
 renderWrongList();
 renderMarkList();
+renderMarkWrongOverview();
 renderRefTab();
 
 PANEL_DEFS.forEach(function(def){ PANELS[def.key].resume(); });

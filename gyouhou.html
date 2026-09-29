@@ -8341,7 +8341,7 @@ function markWrongEntries(src){
   Object.keys(markWrongStore).forEach(function(qid){
     if(src && qid.split(':')[0] !== src) return;
     const e = markWrongStore[qid] || {};
-    list.push({qid:qid, count:e.count || 0, label:e.label, kind:e.kind, at:e.at || 0,
+    list.push({qid:qid, count:e.count || 0, label:e.label, kind:e.kind, at:e.at || 0, last:e.last || 'wrong',
       wrongDates:e.wrongDates, wrongDatesComplete:e.wrongDatesComplete});
   });
   list.sort(function(a,b){ return (b.at - a.at) || (b.count - a.count); });
@@ -8349,8 +8349,14 @@ function markWrongEntries(src){
 }
 function recordMarkReviewAnswer(q, isCorrect){
   if(!q || !q.qid) return;
-  if(isCorrect) return;
   let e = markWrongStore[q.qid];
+  if(isCorrect){
+    if(!e) return;
+    e.last = 'correct';
+    saveMarkWrong();
+    renderMarkWrongOverview();
+    return;
+  }
   if(!e){
     e = {count:0, wrongDates:[], wrongDatesComplete:true};
   }else if(!Array.isArray(e.wrongDates)){
@@ -8365,6 +8371,7 @@ function recordMarkReviewAnswer(q, isCorrect){
   e.label = q.text;
   e.kind = q.tagLabel;
   e.at = at;
+  e.last = 'wrong';
   e.wrongDates.push(at);
   markWrongStore[q.qid] = e;
   saveMarkWrong();
@@ -8525,7 +8532,7 @@ function makeMarkWrongRow(e, holder, src){
   row.className = 'wrongrow';
   row.onclick = function(){ startMarkWrongRetry(e.qid, holder, src); };
   const cnt = document.createElement('div');
-  cnt.className = 'cnt';
+  cnt.className = 'cnt' + (e.last === 'correct' ? ' ok' : '');
   cnt.textContent = '×' + e.count;
   const body = document.createElement('div');
   body.className = 'body';

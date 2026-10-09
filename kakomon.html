@@ -124,8 +124,12 @@
   .later-panel-title span{display:block;color:var(--sub);font-size:.72rem;margin-top:2px;}
   .later-close{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 10px;color:var(--ink);font-size:.75rem;font-weight:700;cursor:pointer;white-space:nowrap;}
   .later-group{border:1px solid var(--line);border-radius:10px;margin-top:8px;overflow:hidden;}
-  .later-group summary{padding:10px 12px;background:#fbf8f3;cursor:pointer;font-size:.82rem;font-weight:700;}
+  .later-group > summary{padding:10px 12px;background:#fbf8f3;cursor:pointer;font-size:.82rem;font-weight:700;}
   .later-group-body{padding:4px 10px 10px;}
+  .later-year{border:1px solid var(--line);border-radius:8px;margin-top:8px;overflow:hidden;}
+  .later-year > summary{padding:9px 10px;background:#fff;cursor:pointer;font-size:.78rem;font-weight:700;}
+  .later-year-body{padding:0 8px 4px;}
+  .later-year-body .later-row:first-child{border-top:0;}
   .later-row{display:flex;align-items:flex-start;gap:9px;border-top:1px solid var(--line);padding:10px 2px;}
   .later-openq{flex:1;min-width:0;border:0;background:transparent;padding:0;text-align:left;color:var(--ink);cursor:pointer;}
   .later-openq b{display:block;color:var(--accent);font-size:.75rem;margin-bottom:3px;}
@@ -825,6 +829,8 @@ function renderLaterList(scope){
   const host = document.getElementById('laterhost');
   const expandedGroups = new Set();
   host.querySelectorAll('.later-group[open]').forEach(details=>expandedGroups.add(details.dataset.group));
+  const expandedYears = new Set();
+  host.querySelectorAll('.later-year[open]').forEach(details=>expandedYears.add(details.dataset.yearKey));
   const selectedExams = scope === 'all' ? EXAMS : [exam];
   const grouped = GROUPS.map(g=>({group:g, items:[]}));
   selectedExams.forEach(e=>{
@@ -847,7 +853,7 @@ function renderLaterList(scope){
   const titleText = document.createElement('b');
   titleText.textContent = scope === 'all' ? '全年度の「あとで解く」' : exam.label + 'の「あとで解く」';
   const subtitle = document.createElement('span');
-  subtitle.textContent = total + '問 · 分野ごとに表示 · 問題を押すとその問題へ移動します';
+  subtitle.textContent = total + '問 · ' + (scope === 'all' ? '分野・年度ごとに開閉できます' : '分野ごとに表示') + ' · 問題を押すとその問題へ移動します';
   title.appendChild(titleText);
   title.appendChild(subtitle);
   const close = document.createElement('button');
@@ -877,7 +883,7 @@ function renderLaterList(scope){
     if(row.items.length){
       const body = document.createElement('div');
       body.className = 'later-group-body';
-      row.items.forEach(item=>{
+      const appendItems = (container, items)=>items.forEach(item=>{
         const rowEl = document.createElement('div');
         rowEl.className = 'later-row';
         const open = document.createElement('button');
@@ -909,8 +915,28 @@ function renderLaterList(scope){
         toggle.appendChild(toggleText);
         rowEl.appendChild(open);
         rowEl.appendChild(toggle);
-        body.appendChild(rowEl);
+        container.appendChild(rowEl);
       });
+      if(scope === 'all'){
+        selectedExams.forEach(e=>{
+          const items = row.items.filter(item=>item.exam.id === e.id);
+          if(!items.length) return;
+          const yearDetails = document.createElement('details');
+          yearDetails.className = 'later-year';
+          yearDetails.dataset.yearKey = row.group.name + ':' + e.id;
+          yearDetails.open = expandedYears.has(yearDetails.dataset.yearKey);
+          const yearSummary = document.createElement('summary');
+          yearSummary.textContent = e.label + '（' + items.length + '問）';
+          yearDetails.appendChild(yearSummary);
+          const yearBody = document.createElement('div');
+          yearBody.className = 'later-year-body';
+          appendItems(yearBody, items);
+          yearDetails.appendChild(yearBody);
+          body.appendChild(yearDetails);
+        });
+      }else{
+        appendItems(body, row.items);
+      }
       details.appendChild(body);
     }
     panel.appendChild(details);
